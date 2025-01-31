@@ -58,7 +58,7 @@ def init_players_db():
             game_id TEXT PRIMARY KEY,
             qq TEXT,
             email TEXT,
-            permission_group TEXT CHECK(permission_group IN ('Player', 'Builder', 'Admin')),
+            permission_group TEXT CHECK(permission_group IN ('Player', 'Graduate Engineer', 'Engineer', 'Senior Engineer', 'Admin')),
             join_date TEXT,
             leave_date TEXT,
             leave_reason TEXT
@@ -339,6 +339,10 @@ def add_player():
     leave_date = data.get('leave_date')
     leave_reason = data.get('leave_reason')
 
+    # 验证 permission_group 是否合法
+    if permission_group not in ['Player', 'Graduate Engineer', 'Engineer', 'Senior Engineer', 'Admin']:
+        return jsonify({"message": "无效的权限组"}), 400
+
     conn = sqlite3.connect(PLAYERS_DATABASE)
     cursor = conn.cursor()
     try:
@@ -372,6 +376,10 @@ def edit_player(game_id):
     join_date = data.get('join_date')
     leave_date = data.get('leave_date')
     leave_reason = data.get('leave_reason')
+
+    # 验证 permission_group 是否合法
+    if permission_group not in ['Player', 'Graduate Engineer', 'Engineer', 'Senior Engineer', 'Admin']:
+        return jsonify({"message": "无效的权限组"}), 400
 
     conn = sqlite3.connect(PLAYERS_DATABASE)
     cursor = conn.cursor()
@@ -419,6 +427,50 @@ def search_players():
         player_list.append(player_dict)
 
     return jsonify(player_list), 200
+
+# 获取特定权限组（Graduate Engineer, Engineer, Senior Engineer）的玩家
+@app.route('/players/engineer-groups', methods=['GET'])
+def get_players_by_engineer_groups():
+    # 连接玩家数据库
+    conn = sqlite3.connect(PLAYERS_DATABASE)
+    cursor = conn.cursor()
+    # 查询特定权限组的玩家
+    cursor.execute('SELECT game_id, qq, email, permission_group, join_date, leave_date FROM players WHERE permission_group IN (?,?,?)', ('Graduate Engineer', 'Engineer', 'Senior Engineer'))
+    players = cursor.fetchall()
+    conn.close()
+
+    player_list = []
+    for player in players:
+        player_dict = {
+            "game_id": player[0],
+            "qq": player[1],
+            "email": player[2],
+            "permission_group": player[3],
+            "join_date": player[4],
+            "leave_date": player[5]
+        }
+        player_list.append(player_dict)
+
+    return jsonify(player_list), 200
+
+# 修改玩家权限组
+@app.route('/players/<string:game_id>/permission-group', methods=['PUT'])
+def update_player_permission_group(game_id):
+    data = request.get_json()
+    new_permission_group = data.get('permission_group')
+
+    # 检查新权限组是否合法
+    if new_permission_group not in ['Player', 'Graduate Engineer', 'Engineer', 'Senior Engineer', 'Admin']:
+        return jsonify({"message": "无效的权限组"}), 400
+
+    conn = sqlite3.connect(PLAYERS_DATABASE)
+    cursor = conn.cursor()
+    # 更新玩家的权限组
+    cursor.execute('UPDATE players SET permission_group =? WHERE game_id =?', (new_permission_group, game_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "玩家权限组修改成功"}), 200
 
 if __name__ == '__main__':
     init_users_db()  # 初始化用户数据库
